@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote_plus
 from typing import Literal
 
 from pydantic import Field, SecretStr
@@ -23,7 +24,7 @@ class AppSettings(BaseSettings):
         case_sensitive=True,
     )
 
-    env: Literal["development", "production", "testing"] = Field(alias="ENV")
+    env: Literal["dev", "production", "testing"] = Field(alias="ENV")
 
     rabbitmq_host: str = Field(alias="RABBITMQ_HOST", min_length=1)
     rabbitmq_port: int = Field(alias="RABBITMQ_PORT", ge=1, le=65535)
@@ -36,9 +37,23 @@ class AppSettings(BaseSettings):
     database_password: SecretStr = Field(alias="DATABASE_PASSWORD")
     database_name: str = Field(alias="DATABASE_NAME", min_length=1)
 
+    @property
+    def rabbitmq_uri(self) -> str:
+        """Build the RabbitMQ connection URI from validated settings."""
+
+        username = quote_plus(self.rabbitmq_username)
+        password = quote_plus(self.rabbitmq_password.get_secret_value())
+        host = self.rabbitmq_host
+        port = self.rabbitmq_port
+
+        return f"amqp://{username}:{password}@{host}:{port}/%2F"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> AppSettings:
     """Return the cached, fully validated application settings."""
 
     return AppSettings()
+
+
+settings = get_settings()

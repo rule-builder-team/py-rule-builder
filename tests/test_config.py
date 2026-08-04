@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 import tempfile
 import unittest
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
 from pydantic import ValidationError
 
-from src.main.config import AppSettings
-
 
 VALID_ENV = {
-    "ENV": "development",
+    "ENV": "dev",
     "RABBITMQ_HOST": "localhost",
     "RABBITMQ_PORT": "5672",
     "RABBITMQ_USERNAME": "guest",
@@ -30,16 +30,18 @@ VALID_ENV = {
 class AppSettingsTests(unittest.TestCase):
     def test_settings_fail_fast_when_required_values_are_missing(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
+            sys.modules.pop("src.main.config", None)
             with self.assertRaises(ValidationError):
-                AppSettings()
+                importlib.import_module("src.main.config")
 
     def test_settings_fail_when_port_is_out_of_range(self) -> None:
         invalid_env = dict(VALID_ENV)
         invalid_env["RABBITMQ_PORT"] = "70000"
 
         with patch.dict(os.environ, invalid_env, clear=True):
+            sys.modules.pop("src.main.config", None)
             with self.assertRaises(ValidationError):
-                AppSettings()
+                importlib.import_module("src.main.config")
 
     def test_settings_load_from_env_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -49,9 +51,12 @@ class AppSettingsTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch.dict(os.environ, {}, clear=True):
-                settings = AppSettings(_env_file=env_file)
+            with patch.dict(os.environ, VALID_ENV, clear=True):
+                sys.modules.pop("src.main.config", None)
+                config_module = importlib.import_module("src.main.config")
 
-        self.assertEqual(settings.env, "development")
+            settings = config_module.AppSettings(_env_file=env_file)
+
+        self.assertEqual(settings.env, "dev")
         self.assertEqual(settings.rabbitmq_host, "localhost")
         self.assertEqual(settings.database_name, "py_rule_builder")
