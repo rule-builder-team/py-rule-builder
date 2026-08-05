@@ -1,96 +1,90 @@
-import ipaddress
 from dataclasses import dataclass
 from option import Result, Ok, Err
-from typing import List, Any
+from enum import Enum
+from typing import List, Dict, Any
+from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError, IPv4Address
 
+# ==========================================
+# 1. מחלקת השגיאה (נשארת ללא שינוי)
+# ==========================================
 @dataclass
 class ApplicationError:
     code: str
     message: str
 
+# ==========================================
+# 2. הגדרות ולידציה בסיסיות (Enums)
+# ==========================================
+class RuleMode(str, Enum):
+    WHITELIST = "whitelist"
+    BLACKLIST = "blacklist"
 
-def validate_mode(mode: str) -> Result[str, ApplicationError]:
-    if mode not in ("blacklist", "whitelist"):
-        return Err(ApplicationError(
-            code="INVALID_MODE",
-            message="Mode must be strictly either 'blacklist' or 'whitelist'."
-        ))
-    return Ok(mode)
+# ==========================================
+# 3. מודלים של Pydantic (מחליפים את הבדיקות הידניות)
+# ==========================================
+class BaseFirewallRequest(BaseModel):
+    # הגדרות מחמירות לכל המודלים: אוסר המרת סוגים אוטומטית ואוסר שדות לא מוכרים
+    model_config = ConfigDict(strict=True, extra="forbid")
 
+class AddIPsRequest(BaseFirewallRequest):
+    # Pydantic בודק אוטומטית שמדובר ב-IPv4 חוקי ושזו רשימה לא ריקה
+    values: List[IPv4Address] = Field(..., min_length=1)
+    mode: RuleMode
 
-def validate_values_array(values: Any) -> Result[List[Any], ApplicationError]:
-    if not isinstance(values, list) or len(values) == 0:
-        return Err(ApplicationError(
-            code="INVALID_VALUES",
-            message="Values must be a non-empty array."
-        ))
-    return Ok(values)
+class AddDomainsRequest(BaseFirewallRequest):
+    values: List[str] = Field(..., min_length=1)
+    mode: RuleMode
 
+    @field_validator("values")
+    @classmethod
+    def validate_domains(cls, domains: List[str]) -> List[str]:
+        for domain in domains:
+            if "://" in domain or "/" in domain or ":" in domain:
+                raise ValueError(f"Domain '{domain}' must not include protocol, path, or port.")
+        return domains
 
-def validate_ids_array(ids: Any) -> Result[List[int], ApplicationError]:
-    if not isinstance(ids, list) or len(ids) == 0:
-        return Err(ApplicationError(
-            code="INVALID_IDS",
-            message="IDs must be a non-empty array of integers."
-        ))
-    
+class AddPortsRequest(BaseFirewallRequest):
+    values: List[int] = Field(..., min_length=1)
+    mode: RuleMode
 
-    if not all(isinstance(i, int) and not isinstance(i, bool) for i in ids):
-        return Err(ApplicationError(
-            code="INVALID_IDS",
-            message="IDs must be a non-empty array of integers."
-        ))
-    return Ok(ids)
+    @field_validator("values")
+    @classmethod
+    def validate_ports(cls, ports: List[int]) -> List[int]:
+        for port in ports:
+            # Pydantic כבר וידא שזה int (בגלל strict=True), אנחנו רק בודקים את הטווח
+            if not (1 <= port <= 65535):
+                raise ValueError(f"Port {port} must be between 1 and 65535.")
+        return ports
 
+class RemoveRulesRequest(BaseFirewallRequest):
+    ids: List[int] = Field(..., min_length=1)
 
-def validate_active_status(active: Any) -> Result[bool, ApplicationError]:
-    if not isinstance(active, bool):
-        return Err(ApplicationError(
-            code="INVALID_ACTIVE_STATUS",
-            message="Active must be a Boolean value (true or false)."
-        ))
-    return Ok(active)
+class UpdateStatusRequest(BaseFirewallRequest):
+    ids: List[int] = Field(..., min_length=1)
+    active: bool
 
-
-def validate_ipv4(ip: str) -> Result[str, ApplicationError]:
+# ==========================================
+# 4. פונקציית הגבול (מחברת הכל יחד)
+# ==========================================
+def validate_request_payload(model_cls: type[BaseModel], payload: Dict[str, Any]) -> Result[BaseModel, ApplicationError]:
+    """
+    פונקציה גנרית שמקבלת מילון (או JSON), מריצה אותו דרך המודל של Pydantic,
+    ומחזירה Ok עם הנתונים המאומתים או Err עם ApplicationError.
+    """
     try:
-        ipaddress.IPv4Address(ip)
-        return Ok(ip)
-    except (ipaddress.AddressValueError, ValueError):
-        return Err(ApplicationError(
-            code="INVALID_IPV4",
-            message=f"'{ip}' is not a valid IPv4 address."
-        ))
+        # Pydantic מבצע את כל הוולידציות בשורה אחת
+        validated_data = model_cls.model_validate(payload)
+        return Ok(validated_data)
 
-
-def validate_domain(domain: str) -> Result[str, ApplicationError]:
-    if not isinstance(domain, str):
-        return Err(ApplicationError(
-            code="INVALID_DOMAIN", 
-            message="Domain must be a string."
-        ))
-
-
-    if "://" in domain or "/" in domain or ":" in domain:
-        return Err(ApplicationError(
-            code="INVALID_DOMAIN",
-            message=f"Domain '{domain}' must not include protocol, path, or port."
-        ))
-    
-    return Ok(domain)
-
-
-def validate_port(port: Any) -> Result[int, ApplicationError]:
-    if not isinstance(port, int) or isinstance(port, bool):
-        return Err(ApplicationError(
-            code="INVALID_PORT",
-            message="Ports must be integers between 1 and 65535."
-        ))
+    except ValidationError as e:
+        # אם Pydantic מצא שגיאה - אנחנו מתרגמים אותה ל-ApplicationError שלנו
+        first_error = e.errors()[0]
         
-    if not (1 <= port <= 65535):
-        return Err(ApplicationError(
-            code="INVALID_PORT",
-            message="Ports must be integers between 1 and 65535."
-        ))
+        # בניית קוד שגיאה דינמי (למשל: INVALID_MODE, INVALID_VALUES, וכו')
+        error_loc = str(first_error["loc"][-1]).upper() if first_error["loc"] else "INPUT"
+        error_code = f"INVALID_{error_loc}"
         
-    return Ok(port)
+        return Err(ApplicationError(
+            code=error_code,
+            message=first_error["msg"]
+        ))
