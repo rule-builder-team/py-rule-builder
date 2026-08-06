@@ -6,7 +6,7 @@ import asyncio
 from typing import Literal
 
 from aio_pika import IncomingMessage, RobustQueue
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantiuc import BaseModel, ConfigDict, Field, ValidationError
 
 from src.adapters.queue.rabbitmq import RabbitMQConnection, rabbitmq_connection
 from src.main.config import settings
