@@ -1,20 +1,17 @@
-FROM python:3.11-slim
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Prevent Python from writing .pyc files and enable instant log streaming
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Copy package manifests from src directory
+COPY src/package*.json ./
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Node dependencies
+RUN npm install
 
-# Copy project code
+# Copy application source code
 COPY . .
 
-# Set PYTHONPATH so Python can resolve imports from src
-ENV PYTHONPATH=/app
+EXPOSE 3000
 
-# Start the Python application
-CMD ["python", "-m", "src.main"]
+# Start the TypeScript server
+CMD ["npx", "tsx", "src/main/server.ts"]

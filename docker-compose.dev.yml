@@ -17,24 +17,38 @@ services:
     networks:
       - app-network
 
-  python-worker:
+  # RabbitMQ service container
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management Dashboard UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - app-network
+
+  ts-service:
     build:
-      # Build context relative to current directory
       context: .
       dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
     env_file:
       - ./.env.dev
     environment:
-      # Fallback default prevents warning if RABBITMQ_URL is not set
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@localhost:5672}
+      # Connect to rabbitmq container by service name
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
     depends_on:
       database:
         condition: service_healthy
+      rabbitmq:
+        condition: service_started
     volumes:
-      # Dynamic mapping from current folder to container working dir
       - .:/app
-    # Command to run the Python service entrypoint
-    command: python -m src.main
+      - /app/node_modules
+    command: npx tsx src/main/server.ts
     networks:
       - app-network
 
