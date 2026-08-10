@@ -1,26 +1,29 @@
 import { Rule, type RuleMode, type RuleType } from '../../domain/Rule';
 import { type RuleRepository } from '../ports/outbound/RuleRepository';
+import { type RabbitMQService } from '../../adapters/outbound/rabbitmq/RabbitMQService';
 
 export class FirewallService {
-  constructor(private readonly ruleRepository: RuleRepository) {}
+  constructor(
+    private readonly ruleRepository: RuleRepository,
+    private readonly rabbitmqService: RabbitMQService
+  ) {}
 
   async addRules(type: RuleType, mode: RuleMode, values: any[]) {
     if (mode !== 'blacklist' && mode !== 'whitelist') throw new Error('INVALID_MODE');
     if (!Array.isArray(values) || values.length === 0) throw new Error('INVALID_VALUES');
 
-  
-    const createdRules = await Promise.all(
-      values.map(async value => {
-        const newRule = new Rule(undefined, type, mode, value, true);
-        return await this.ruleRepository.save(newRule);
-      })
-    );
+    const createdRules = values.map(value => new Rule(undefined, type, mode, value, true));
+    const envelope = this.rabbitmqService.createEnvelope('CREATE_RULE', {
+      type,
+      mode,
+      rules: createdRules.map(rule => rule.toJSON())
+    });
+    await this.rabbitmqService.publish('firewall-rules-queue', envelope);
 
-  
     return {
       type,
       mode,
-      values: createdRules.map((r: Rule) => ({ id: r.id, value: r.value, active: r.active })),
+      values: createdRules.map(rule => ({ id: rule.id, value: rule.value, active: rule.active })),
       status: 'success'
     };
   }
@@ -28,15 +31,18 @@ export class FirewallService {
   async deleteRules(ids: any[]) {
     this.validateIds(ids);
 
-    // הוספת await למיצוי ה-Promise
     const existing = await this.ruleRepository.findByIds(ids);
     if (existing.length !== ids.length) {
       throw new Error('RULE_NOT_FOUND');
     }
 
-    // הוספת await לקריאה למחיקה
-    const removed = await this.ruleRepository.delete(ids);
-    return { removed: removed.map((r: Rule) => r.toJSON()), status: 'success' };
+    // Publish delete command to RabbitMQ using standardized message envelope
+    const envelope = this.rabbitmqService.createEnvelope('DELETE_RULE', {
+      ids: ids
+    });
+    await this.rabbitmqService.publish('firewall-rules-queue', envelope);
+
+    return { ids: ids, status: 'success', message: 'Delete command published for processing' };
   }
 
   async getRules(type?: string) {
@@ -44,7 +50,6 @@ export class FirewallService {
       throw new Error('INVALID_TYPE_FILTER');
     }
 
-    // הוספת await לקריאת כל החוקים
     let rules = await this.ruleRepository.getAll();
     if (type) {
       rules = rules.filter((r: Rule) => r.type === type);
@@ -61,17 +66,17 @@ export class FirewallService {
     this.validateIds(ids);
     if (typeof active !== 'boolean') throw new Error('INVALID_ACTIVE_STATUS');
 
-    // הוספת await לחיפוש החוקים לפי מזהים
     const existingRules = await this.ruleRepository.findByIds(ids);
     if (existingRules.length !== ids.length) throw new Error('RULE_NOT_FOUND');
 
-    existingRules.forEach((rule: Rule) => {
-      rule.updateStatus(active);
+    // Publish status update command to RabbitMQ using standardized message envelope
+    const envelope = this.rabbitmqService.createEnvelope('UPDATE_RULE', {
+      ids: ids,
+      active: active
     });
+    await this.rabbitmqService.publish('firewall-rules-queue', envelope);
 
-    
-    const updated = await this.ruleRepository.saveAll(existingRules);
-    return { updated: updated.map((r: Rule) => r.toJSON()), status: 'success' };
+    return { ids: ids, active: active, status: 'success', message: 'Status update command published for processing' };
   }
 
   private validateIds(ids: any[]) {

@@ -1,5 +1,6 @@
 {
   "devDependencies": {
+    "@types/amqplib": "^0.10.7",
     "@types/express": "^5.0.6",
     "@types/node": "^26.1.2",
     "@types/pg": "^8.20.0",
@@ -22,6 +23,8 @@
   "description": "",
   "main": "server.js",
   "scripts": {
+    "start": "npx tsx main/server.ts",
+    "dev": "npx tsx main/server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

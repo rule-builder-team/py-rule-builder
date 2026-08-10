@@ -3,6 +3,7 @@ import express from 'express';
 import { config } from './env';
 import { databaseService } from '../adapters/outbound/persistence/drizzle/DatabaseService';
 import { DrizzleRuleRepository } from '../adapters/outbound/persistence/DrizzleRuleRepository';
+import { RabbitMQService } from '../adapters/outbound/rabbitmq/RabbitMQService';
 import { FirewallService } from '../application/use-cases/FirewallService';
 import { FirewallController } from '../adapters/inbound/FirewallController';
 
@@ -15,12 +16,12 @@ app.use((req, res, next) => {
 });
 
 async function bootstrap() {
-  
   await databaseService.connectWithRetry();
+  const rabbitmqService = RabbitMQService.getInstance();
+  await rabbitmqService.connectWithRetry();
 
- 
   const ruleRepository = new DrizzleRuleRepository();
-  const firewallService = new FirewallService(ruleRepository);
+  const firewallService = new FirewallService(ruleRepository, rabbitmqService);
   const firewallController = new FirewallController(firewallService);
 
   app.use('/api/firewall', firewallController.router);

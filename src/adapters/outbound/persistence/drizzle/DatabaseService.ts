@@ -19,6 +19,11 @@ export class DatabaseService {
 
   
   public async connectWithRetry(maxRetries = 5): Promise<void> {
+    // IMPORTANT: This Node.js service is READ-ONLY by design.
+    // To enforce database access constraints at the infrastructure level, configure the connection pool
+    // to use a read-only database user. This provides an extra layer of protection against accidental
+    // or unintended write operations. Example: create a PostgreSQL role with only SELECT permissions
+    // and configure config.databaseUri to authenticate using that role's credentials.
     this.pool = new Pool({ connectionString: config.databaseUri });
     this.db = drizzle(this.pool);
 

@@ -1,7 +1,4 @@
-version: '3.8'
-
 services:
-
   database:
     image: postgres:16-alpine
     environment:
@@ -9,43 +6,64 @@ services:
       POSTGRES_PASSWORD: dev_password
       POSTGRES_DB: dev_db
     ports:
-      - "5432:5432" 
+      - "5432:5432"
     volumes:
-      - pgdata_dev:/var/lib/postgresql/data 
-    healthcheck: 
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d dev_db"]
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - app-network
 
-  
-  backend:
+  js-backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     env_file:
-      - ./backend/.env.dev 
+      - ./.env.dev
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL}
     depends_on:
       database:
-        condition: service_healthy 
+        condition: service_healthy
     volumes:
-      - ./backend:/app 
+      - ./:/app
       - /app/node_modules
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:3000/api/firewall/rules', res => process.exit(res.statusCode >= 500 ? 1 : 0)).on('error', () => process.exit(1))\""
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
 
-  
-  frontend:
+  python-worker:
     build:
-      context: ./frontend
+      context: ./python_backend
       dockerfile: Dockerfile
-    ports:
-      - "5173:5173"
+    env_file:
+      - ./python_backend/.env.dev
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL}
     depends_on:
-      - backend
+      database:
+        condition: service_healthy
     volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - ./python_backend:/app
+    networks:
+      - app-network
 
 volumes:
-  pgdata_dev: 
+  pgdata_dev:
+
+networks:
+  app-network:
+    driver: bridge

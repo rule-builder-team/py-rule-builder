@@ -12,6 +12,10 @@ const envSchema = z.object({
   DB_CONNECTION_INTERVAL: z.coerce.number().min(1000).default(5000),
   DATABASE_URI_DEV: z.string().url('Must be a valid database connection URL'),
   DATABASE_URI_PROD: z.string().url('Must be a valid database connection URL'),
+  RABBITMQ_URL: z
+    .string()
+    .url('Must be a valid RabbitMQ connection URL')
+    .default('amqps://fphatfki:MlSv9YPSrKuGikH58QqpDPPAF5AVoYjZ@gerbil.rmq.cloudamqp.com/fphatfki'),
 });
 
 
@@ -46,16 +50,17 @@ class Config {
   public readonly port: number;
   public readonly dbConnectionInterval: number;
   public readonly databaseUri: string;
+  public readonly rabbitmqUrl: string;
   public readonly constants: typeof CONSTANTS;
 
   private constructor() {
     this.env = envVars.ENV;
     this.port = envVars.PORT;
-    
-  this.dbConnectionInterval = envVars.DB_CONNECTION_INTERVAL;
+    this.dbConnectionInterval = envVars.DB_CONNECTION_INTERVAL;
     this.databaseUri = this.env === 'production' 
       ? envVars.DATABASE_URI_PROD 
       : envVars.DATABASE_URI_DEV;
+    this.rabbitmqUrl = envVars.RABBITMQ_URL;
       
     this.constants = CONSTANTS;
   }

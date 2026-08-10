@@ -19,10 +19,10 @@ export class FirewallController {
   }
 
   private addRules(type: RuleType) {
-    return (req: Request, res: Response) => {
+    return async (req: Request, res: Response) => {
       try {
         const { values, mode } = req.body;
-        const result = this.firewallService.addRules(type, mode, values);
+        const result = await this.firewallService.addRules(type, mode, values);
         res.status(201).json(result);
       } catch (error: any) {
         this.handleError(res, error);
@@ -30,30 +30,30 @@ export class FirewallController {
     };
   }
 
-  private deleteRules(req: Request, res: Response) {
+  private async deleteRules(req: Request, res: Response) {
     try {
       const { ids } = req.body;
-      const result = this.firewallService.deleteRules(ids);
+      const result = await this.firewallService.deleteRules(ids);
       res.status(200).json(result);
     } catch (error: any) {
       this.handleError(res, error);
     }
   }
 
-  private getRules(req: Request, res: Response) {
+  private async getRules(req: Request, res: Response) {
     try {
       const type = req.query.type as string;
-      const rules = this.firewallService.getRules(type);
+      const rules = await this.firewallService.getRules(type);
       res.status(200).json(rules);
     } catch (error: any) {
       this.handleError(res, error);
     }
   }
 
-  private updateStatus(req: Request, res: Response) {
+  private async updateStatus(req: Request, res: Response) {
     try {
       const { ids, active } = req.body;
-      const result = this.firewallService.updateRulesStatus(ids, active);
+      const result = await this.firewallService.updateRulesStatus(ids, active);
       res.status(200).json(result);
     } catch (error: any) {
       this.handleError(res, error);
