@@ -103,4 +103,4 @@ def load_settings() -> AppSettings:
 
 
 # Exported config object & constants ready for import across the program
-config = load_settings()
+settings= load_settings()
