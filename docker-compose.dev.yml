@@ -17,47 +17,24 @@ services:
     networks:
       - app-network
 
-  js-backend:
+  python-worker:
     build:
+      # Build context relative to current directory
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
     env_file:
       - ./.env.dev
     environment:
-      RABBITMQ_URL: ${RABBITMQ_URL}
+      # Fallback default prevents warning if RABBITMQ_URL is not set
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@localhost:5672}
     depends_on:
       database:
         condition: service_healthy
     volumes:
-      - ./:/app
-      - /app/node_modules
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "node -e \"require('http').get('http://127.0.0.1:3000/api/firewall/rules', res => process.exit(res.statusCode >= 500 ? 1 : 0)).on('error', () => process.exit(1))\""
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app-network
-
-  python-worker:
-    build:
-      context: ./python_backend
-      dockerfile: Dockerfile
-    env_file:
-      - ./python_backend/.env.dev
-    environment:
-      RABBITMQ_URL: ${RABBITMQ_URL}
-    depends_on:
-      database:
-        condition: service_healthy
-    volumes:
-      - ./python_backend:/app
+      # Dynamic mapping from current folder to container working dir
+      - .:/app
+    # Command to run the Python service entrypoint
+    command: python -m src.main
     networks:
       - app-network
 

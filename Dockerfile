@@ -1,27 +1,20 @@
-FROM node:20-alpine
-
-# Install Python 3 and pip
-RUN apk add --no-cache python3 py3-pip
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Create a virtual environment and update PATH
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# Prevent Python from writing .pyc files and enable instant log streaming
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Copy requirements.txt and install Python dependencies
-COPY requirements.txt ./
+# Install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy Node.js configurations and install dependencies
-COPY package*.json ./
-RUN npm install
-
-# Copy the rest of the application files
+# Copy project code
 COPY . .
 
-EXPOSE 3000
+# Set PYTHONPATH so Python can resolve imports from src
+ENV PYTHONPATH=/app
 
-# Start the application
-CMD ["npx", "tsx", "main/server.ts"]
+# Start the Python application
+CMD ["python", "-m", "src.main"]
