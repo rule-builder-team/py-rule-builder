@@ -17,12 +17,12 @@ services:
     networks:
       - app-network
 
-  # RabbitMQ service container
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
-      - "5672:5672"   # AMQP protocol port
-      - "15672:15672" # Management Dashboard UI
+      - "5672:5672"  
+      - "15672:15672"
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -37,14 +37,9 @@ services:
       - "3000:3000"
     env_file:
       - ./.env.dev
-    environment:
-      # Connect to rabbitmq container by service name
-      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672}
     depends_on:
       database:
         condition: service_healthy
-      rabbitmq:
-        condition: service_started
     volumes:
       - .:/app
       - /app/node_modules
