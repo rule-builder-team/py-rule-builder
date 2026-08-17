@@ -1,4 +1,4 @@
-"""Async RabbitMQ connection adapter built with aio-pika."""
+
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from src.main.logger import logger
 
 
 class RabbitMQConnection:
-    """Manage the lifecycle of a single RabbitMQ connection."""
+
 
     def __init__(self, connection_url: str | None = None) -> None:
         self._connection_url = connection_url or settings.rabbitmq_uri
@@ -17,12 +17,12 @@ class RabbitMQConnection:
 
     @property
     def connection(self) -> RobustConnection | None:
-        """Return the current connection instance, if one is open."""
+
 
         return self._connection
 
     async def connect(self) -> RobustConnection:
-        """Open a robust RabbitMQ connection and cache it for reuse."""
+
 
         if self._connection is not None and not self._connection.is_closed:
             return self._connection
@@ -54,7 +54,7 @@ class RabbitMQConnection:
         return self._connection
 
     async def close(self) -> None:
-        """Close the cached RabbitMQ connection if it is open."""
+
 
         if self._connection is None or self._connection.is_closed:
             return

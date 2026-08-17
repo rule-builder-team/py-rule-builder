@@ -1,9 +1,8 @@
-﻿annotated-types==0.8.0
-aio-pika>=9.4.3,<10
-pydantic==2.13.4
-pydantic_core==2.46.4
-pydantic-settings>=2.7.0,<3
-colorama>=0.4.6,<1
-structlog>=25.1.0,<26
-typing-inspection==0.4.2
-typing_extensions==4.16.0
+aio-pika>=9.3.0
+asyncpg>=0.29.0
+SQLAlchemy>=2.0.25
+pydantic>=2.6.0
+pydantic-settings>=2.1.0
+option>=2.0.1
+structlog>=24.1.0
+greenlet>=3.0.3
